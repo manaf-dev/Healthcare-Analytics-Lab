@@ -1,0 +1,142 @@
+PART 2: OLTP QUERY ANALYSIS
+
+QUESTION 1: Monthly Encounters by Specialty
+
+SQL QUERY:
+   SELECT 
+      DATE_FORMAT(e.encounter_date, '%Y-%m') AS encounter_month,
+      s.specialty_name,
+      e.encounter_type,
+      COUNT(DISTINCT e.encounter_id) AS total_encounters,
+      COUNT(DISTINCT e.patient_id) AS unique_patients
+   FROM encounters e
+   INNER JOIN providers p ON e.provider_id = p.provider_id
+   INNER JOIN specialties s ON p.specialty_id = s.specialty_id
+   GROUP BY 
+      encounter_month,
+      s.specialty_name,
+      e.encounter_type
+   ORDER BY encounter_month, specialty_name, encounter_type;
+
+SCHEMA ANALYSIS
+   Tables Joined: [encounters, providers, specialties]
+   Number of Joins: 2
+
+PERFORMANCE:
+   Execution Time (client): 0:00:0.07800000 seconds
+   Execution Time (server): 0:00:0.09014050 seconds
+   Estimated Rows Scanned: 41692
+
+BOTTLENECK IDENTIFIED:
+   ROOT CAUSE: 
+   Why This is Slow:
+      
+
+
+QUESTION 2: Top Diagnosis-Procedure Pairs
+
+SQL QUERY:
+   SELECT 
+      d.icd10_code,
+      pr.cpt_code,
+      COUNT(DISTINCT ed.encounter_id) AS encounter_count
+   FROM encounter_diagnoses ed
+      INNER JOIN diagnoses d ON ed.diagnosis_id = d.diagnosis_id
+      INNER JOIN encounter_procedures ep ON ed.encounter_id = ep.encounter_id
+      INNER JOIN procedures pr ON ep.procedure_id = pr.procedure_id
+   GROUP BY 
+      d.icd10_code,
+      pr.cpt_code,
+   ORDER BY encounter_count DESC;
+
+SCHEMA ANALYSIS:
+   Tables Joined: [encounter_diagnoses, diagnoses, encounter_procedures, procedures]
+   Number of Joins: 3
+
+PERFORMANCE:
+   Execution Time (client): 0:00:0.21800000 seconds
+   Execution Time (server): 0:00:0.22998080 seconds
+   Estimated Rows Scanned: 170770
+
+BOTTLENECK IDENTIFIED:     
+   ROOT CAUSE: 
+   Why This is EXTREMELY Slow:
+
+
+
+QUESTION 3: 30-Day Readmission Rate
+
+SQL QUERY:
+   SELECT 
+      s.specialty_name,
+      COUNT(DISTINCT e1.encounter_id) AS total_inpatient_discharges,
+      COUNT(DISTINCT CASE 
+         WHEN e2.encounter_id IS NOT NULL THEN e1.encounter_id 
+      END) AS readmissions,
+      ROUND(
+         100.0 * COUNT(DISTINCT CASE WHEN e2.encounter_id IS NOT NULL 
+                                       THEN e1.encounter_id END) 
+         / NULLIF(COUNT(DISTINCT e1.encounter_id), 0), 
+         2
+      ) AS readmission_rate_percent
+   FROM encounters e1
+   INNER JOIN providers p1 ON e1.provider_id = p1.provider_id
+   INNER JOIN specialties s ON p1.specialty_id = s.specialty_id
+   LEFT JOIN encounters e2 ON 
+      e2.patient_id = e1.patient_id 
+      AND e2.encounter_date > e1.discharge_date
+      AND e2.encounter_date <= DATE_ADD(e1.discharge_date, INTERVAL 30 DAY)
+      AND e2.encounter_id != e1.encounter_id
+   WHERE e1.encounter_type = 'Inpatient'
+      AND e1.discharge_date IS NOT NULL
+   GROUP BY s.specialty_name
+   ORDER BY readmission_rate_percent DESC;
+
+SCHEMA ANALYSIS:
+   Tables Joined: [encounters (self-join), providers, specialties]
+   Number of Joins: 3 (including 1 self-join)
+
+PERFORMANCE ANALYSIS:
+   Execution Time (client): 0:00:0.1100000 seconds 
+   Execution Time (server): 0:00:0.1080080 seconds 
+   Estimated Rows Scanned: 83777
+
+BOTTLENECK IDENTIFIED:
+   ROOT CAUSE: 
+   Why This is EXTREMELY Slow:
+   
+
+
+
+QUESTION 4: Revenue by Specialty & Month
+
+SQL QUERY:
+   SELECT 
+      DATE_FORMAT(e.encounter_date, '%Y-%m') AS revenue_month,
+      s.specialty_name,
+      COUNT(DISTINCT e.encounter_id) AS encounter_count,
+      SUM(b.allowed_amount) AS total_allowed_amount,
+      ROUND(AVG(b.allowed_amount), 2) AS avg_allowed_per_encounter
+   FROM billing b
+   INNER JOIN encounters e ON b.encounter_id = e.encounter_id
+   INNER JOIN providers p ON e.provider_id = p.provider_id
+   INNER JOIN specialties s ON p.specialty_id = s.specialty_id
+   GROUP BY 
+      DATE_FORMAT(e.encounter_date, '%Y-%m'),
+      s.specialty_name
+   ORDER BY revenue_month, total_allowed_amount DESC;
+
+SCHEMA ANALYSIS:
+   Tables Joined: [billing, encounters, providers, specialties]
+   Number of Joins: 3
+
+
+PERFORMANCE ANALYSIS:
+   Execution Time (client): 0:00:0.18700000 seconds
+   Execution Time (server): 0:00:0.19844980 seconds
+   Estimated Rows Scanned: 91312
+
+BOTTLENECK IDENTIFIED:
+   ROOT CAUSE: 
+   Why This is Slow:
+   
