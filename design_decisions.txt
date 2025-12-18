@@ -1,0 +1,114 @@
+PART 3: DESIGN DECISIONS
+
+DECISION 1: FACT TABLE GRAIN
+
+CHOSEN OPTION: Option A - One row per encounter
+
+JUSTIFICATION:
+After analyzing all 4 business questions, the encounter-level grain is optimal 
+because:
+   - It supports all four analytical questions efficiently
+   - Encounters are the fundamental unit of healthcare delivery
+   - All events (diagnoses, procedures, billing) happen within an encounter
+
+One row in fact_encounters represents one healthcare encounter (visit), 
+capturing all associated metrics, with separate bridge tables for the 
+many-to-many relationships to diagnoses and procedures.
+
+
+DECISION 2: DIMENSION TABLES
+
+DATE DIMENSION
+   - date_key (PK)
+   - calendar_date
+   - year
+   - quarter
+   - month
+   - month_name
+   - day
+   - week
+
+PATIENT DIMENSION
+   - patient_key (PK)
+   - patient_id
+   - mrn
+   - first_name
+   - last_name
+   - full_name
+   - date_of_birth
+   - age
+   - age_group
+   - gender
+
+PROVIDER DIMENSION
+   - provider_key (PK)
+   - provider_id
+   - first_name
+   - last_name
+   - full_name
+   - credential
+   - specialty_name
+   - specialty_code
+   - specialty_key
+   - department_name
+   - department_key
+   - department_floor
+   - is_active
+   - hire_date
+   - years_of_service
+
+SPECIALTY DIMENSION
+   - specialty_key (PK)
+   - specialty_id
+   - specialty_name
+   - specialty_code
+
+DEPARTMENT DIMENSION
+   - department_key (PK)
+   - department_id
+   - department_name
+   - department_code
+   - floor
+   - capacity
+
+ENCOUNTER TYPE DIMENSION
+   - encounter_type_key (PK)
+   - encounter_type
+
+DIAGNOSIS DIMENSION
+   - diagnosis_key (PK)
+   - diagnosis_id
+   - icd10_code
+   - icd10_description
+
+PROCEDURE DIMENSION 
+   - procedure_key (PK)
+   - procedure_id
+   - cpt_code
+   - cpt_description
+
+
+DECISION 3: PRE-AGGREGATED METRICS
+The fact table will include these pre-aggregated metrics:
+   - diagnosis_count
+   - procedure_count
+   - allowed_amount
+   - payment_amount
+   - length_of_stay_days
+   - length_of_stay_hours
+
+Justification:
+   Eliminates need to count from bridge table
+   Supports quick filtering (WHERE diagnosis_count > 2)
+   Reduces computation overhead for financial queries
+   Commonly used metrics are pre-computed for performance
+
+
+DECISION 4: BRIDGE TABLES
+
+DECISION: YES
+RATIONALE:
+   - Encounters can have multiple diagnoses and procedures
+   - Bridge tables preserve normalized relationships
+   - Keeps the encounter fact table narrow and performant
+   - Denormalizing all codes into wide arrays/columns would hinder flexible analytics and bloat the fact table
