@@ -1,0 +1,113 @@
+PART 3: STAR SCHEMA QUERIES
+
+QUESTION 1: Monthly Encounters by Specialty
+
+SQL QUERY:
+   SELECT 
+        d.month_name AS encounter_month,
+        d.year AS encounter_year,
+        s.specialty_name,
+        et.encounter_type,
+        COUNT(f.fact_encounter_id) AS total_encounters,
+        COUNT(DISTINCT f.patient_key) AS unique_patients
+    FROM fact_encounters f
+    INNER JOIN dim_date d ON f.encounter_date_key = d.date_key
+    INNER JOIN dim_specialty s ON f.specialty_key = s.specialty_key
+    INNER JOIN dim_encounter_type et ON f.encounter_type_key = et.encounter_type_key
+    GROUP BY 
+        d.month_name,
+        d.year,
+        s.specialty_name,
+        et.encounter_type
+    ORDER BY d.month_name, d.year, s.specialty_name, et.encounter_type;
+
+Execution time (client): 0:00:0.10900000 seconds
+Execution time (server): 0:00:0.11839830 seconds
+Improvement vs. normalized: 
+Explanation: 
+
+
+QUESTION 2: Top Diagnosis-Procedure Pairs
+
+SQL QUERY:
+    SELECT 
+        d.icd10_code,
+        p.cpt_code,
+        COUNT(DISTINCT bed.fact_encounter_id) AS encounter_count
+    FROM bridge_encounter_diagnoses bed
+        INNER JOIN bridge_encounter_procedures bep 
+        ON bed.fact_encounter_id = bep.fact_encounter_id
+        INNER JOIN dim_diagnosis d ON bed.diagnosis_key = d.diagnosis_key
+        INNER JOIN dim_procedure p ON bep.procedure_key = p.procedure_key
+    GROUP BY 
+        d.icd10_code,
+        p.cpt_code
+    ORDER BY encounter_count DESC;
+
+Execution time (client): 0:00:0.18700000 seconds
+Execution time (server): 0:00:0.17958630 seconds
+Improvement vs. normalized:
+Explanation: 
+
+
+QUESTION 3: 30-Day Readmission Rate
+
+SQL QUERY:
+    SELECT 
+        s.specialty_name,
+        COUNT(DISTINCT f1.fact_encounter_id) AS total_inpatient_discharges,
+        COUNT(DISTINCT CASE 
+            WHEN f2.fact_encounter_id IS NOT NULL THEN f1.fact_encounter_id 
+        END) AS readmissions,
+        ROUND(
+            100.0 * COUNT(DISTINCT CASE WHEN f2.fact_encounter_id IS NOT NULL 
+                                        THEN f1.fact_encounter_id END) 
+            / NULLIF(COUNT(DISTINCT f1.fact_encounter_id), 0), 
+            2
+        ) AS readmission_rate_percent
+    FROM fact_encounters f1
+    INNER JOIN dim_specialty s ON f1.specialty_key = s.specialty_key
+    LEFT JOIN fact_encounters f2 ON 
+        f2.patient_key = f1.patient_key 
+        AND f2.discharge_date_key > f1.discharge_date_key
+        AND f2.discharge_date_key <= f1.discharge_date_key + 30
+        AND f2.fact_encounter_id != f1.fact_encounter_id
+    WHERE f1.encounter_type_key IN (
+        SELECT encounter_type_key FROM dim_encounter_type WHERE encounter_type = 'inpatient'
+    )
+        AND f1.discharge_date_key IS NOT NULL
+    GROUP BY s.specialty_name
+    ORDER BY readmission_rate_percent DESC;
+
+Execution time (client): 0:00:0.0.07800000 seconds
+Execution time (server): 0:00:0.0.08232560 seconds
+Improvement vs. normalized:
+Explanation: 
+
+
+
+QUERY 4: Revenue by Specialty & Month
+
+SQL QUERY:
+    SELECT 
+        d.month AS revenue_month,
+        d.year AS revenue_year,
+        s.specialty_name,
+        COUNT(f.fact_encounter_id) AS encounter_count,
+        SUM(f.allowed_amount) AS total_allowed_amount,
+        ROUND(AVG(f.allowed_amount), 2) AS avg_allowed_per_encounter
+    FROM fact_encounters f
+    INNER JOIN dim_date d ON f.encounter_date_key = d.date_key
+    INNER JOIN dim_specialty s ON f.specialty_key = s.specialty_key
+    WHERE f.allowed_amount IS NOT NULL
+    GROUP BY 
+        d.year,
+        d.month,
+        s.specialty_name
+    ORDER BY d.year, d.month, total_allowed_amount DESC;
+
+
+Execution time (client): 0:00:0.09400000 seconds
+Execution time (server): 0:00:0.10344160 seconds
+Improvement vs. normalized: 
+Explanation: 
