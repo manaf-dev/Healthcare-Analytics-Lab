@@ -53,7 +53,6 @@ PROVIDER DIMENSION
    - department_name
    - department_key
    - department_floor
-   - is_active
    - hire_date
    - years_of_service
 

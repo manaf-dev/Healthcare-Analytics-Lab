@@ -24,7 +24,6 @@ CREATE TABLE dim_patient (
     age INT,
     age_group VARCHAR(20),
     gender CHAR(10),
-    is_active TINYINT NOT NULL DEFAULT 1,
     INDEX idx_patient_id (patient_id)
 );
 
@@ -66,7 +65,6 @@ CREATE TABLE dim_provider (
     department_name VARCHAR(100),
     department_floor INT,
     department_key INT,
-    is_active TINYINT NOT NULL DEFAULT 1,
     hire_date DATE,
     years_of_service INT,
     FOREIGN KEY (specialty_key) REFERENCES dim_specialty(specialty_key),

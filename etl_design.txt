@@ -1,0 +1,133 @@
+PART 3: ETL DESIGN FOR STAR SCHEMA
+
+DIMENSION LOAD LOGIC
+--------------------------------------------
+
+1. dim_patient
+
+NARRATIVE:
+
+    Extract all records from the patients table.
+    For each patient:
+        Check if patient_id already exists in dim_patient.
+        If not found:
+            Insert a new row.
+            Derive:
+                full_name = first_name + ' ' + last_name
+                age from date_of_birth
+                age_group (e.g., 0–17, 18–35, 36–55, 56+)
+
+        If found:
+            Compare key descriptive attributes (name, gender, DOB).
+            If changes are detected:
+                Update the existing record.
+    Maintain an index on patient_id for fast lookups during fact loads.
+
+
+2. dim_date
+
+PSEUDOCODE:
+    Generate dates for 10-year range (5 years past, 5 years future)
+
+    start_date = NOW - INTERVAL 5 YEAR
+    end_date = NOW + INTERVAL 5 YEAR
+
+    FOR date FROM start_date TO end_date
+        date_key = YYYYMMDD
+        year = year(date)
+        quarter = quarter(date)
+        month = month(date)
+        month_name = name(month)
+        day = day_name(date)
+        week = week_of_year(date)
+        INSERT INTO dim_date
+    END FOR
+
+
+3. handling updates in dimensions:
+    If a record exists: update descriptive fields.
+    If it does not exist: insert a new row.
+    No deletes; inactive data remains for historical consistency.
+
+
+
+FACT TABLE LOAD LOGIC
+--------------------------------------------
+
+1. fact_encounters
+
+Source Tables:
+    encounters
+    billing
+    encounter_diagnoses
+    encounter_procedures
+
+Load Logic (Narrative):
+
+    Extract new or changed encounters since last load.
+    For each encounter:
+        Look up dimension surrogate keys:
+            patient_key from dim_patient
+            provider_key from dim_provider
+            specialty_key from dim_specialty
+            department_key from dim_department
+            encounter_type_key from dim_encounter_type
+            encounter_date_key and discharge_date_key from dim_date
+
+        If any dimension key is missing:
+            Use a default “Unknown” dimension record (key = 0).
+
+
+2. Pre-aggregate metrics:
+    diagnosis_count = count of encounter_diagnoses for this encounter
+    procedure_count = count of encounter_procedures for this encounter
+    total_procedure_rvu = sum of relative_value_units from procedures
+    allowed_amount, payment_amount from billing table
+    length_of_stay_hours = difference between discharge and encounter datetime in hours
+    length_of_stay_days = ceiling(length_of_stay_hours / 24)
+
+
+3. Handling missing data:
+    If no diagnoses/procedures, set counts to 0.
+    If no billing records, amounts = 0 or NULL.
+    missing discharge_date, length_of_stay = NULL.
+    missing dimension keys, assign to “Unknown” (key=0).
+
+
+
+BRIDGE TABLE LOAD LOGIC
+--------------------------------------------
+
+1. bridge_encounter_diagnoses
+Load logic (Narrative):
+    After loading fact_encounters, retrieve fact_encounter_id using encounter_id.
+    Join encounter_diagnoses to dim_diagnosis.
+    Insert:
+        fact_encounter_id
+        diagnosis_key
+        diagnosis_sequence
+
+
+2. bridge_encounter_procedures
+Load logic (Narrative):
+    Retrieve fact_encounter_id.
+    Join encounter_procedures to dim_procedure.
+    Insert:
+        procedure_key
+        procedure_date
+        procedure_sequence
+
+
+
+REFRESH STRATEGY
+--------------------------------------------
+
+1. Load frequency:
+    One-time for date dimension.
+    Daily incremental loads for other dimensions and fact table.
+
+2. Handling late-arriving facts:
+    use encounter_id as natural key to check if encounter already exists in fact table.
+    If encounter exists, update fact records:
+        Recalculate pre-aggregated metrics.
+    If not, insert new fact record.
