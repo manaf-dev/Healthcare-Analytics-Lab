@@ -23,8 +23,8 @@ SQL QUERY:
 
 Execution time (client): 0:00:0.10900000 seconds
 Execution time (server): 0:00:0.11839830 seconds
-Improvement factor: 1.3x faster
-Explanation: The star schema query is faster because it uses pre-aggregated fact tables and dimension tables, eliminating the need for complex joins and runtime aggregations.
+Improvement factor: 1.3x slower
+Explanation: The star schema query introduces dimension tables that allow for more efficient joins and indexing. However, the performance gain is less pronounced due to the overhead of joining additional dimension tables.
 
 
 QUESTION 2: Top Diagnosis-Procedure Pairs
