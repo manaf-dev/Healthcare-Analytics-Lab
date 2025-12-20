@@ -28,8 +28,12 @@ PERFORMANCE:
    Estimated Rows Scanned: 41692
 
 BOTTLENECK IDENTIFIED:
-   ROOT CAUSE: 
-   Why This is Slow:
+   ROOT CAUSE: The query performs joins across multiple normalized tables and applies date formatting and aggregation on the fly.
+   Why This is Slow: 
+      - The query must join three transactional tables for every execution.
+      - DATE_FORMAT(e.encounter_date, '%Y-%m') is calculated at runtime, which prevents efficient index usage on encounter_date.
+      - The grouping happens on derived values (formatted date, specialty name, encounter type), forcing the database to scan and aggregate a large number of rows.
+      - Distinct counts on both encounters and patients add additional computational overhead.
       
 
 
@@ -59,9 +63,11 @@ PERFORMANCE:
    Estimated Rows Scanned: 170770
 
 BOTTLENECK IDENTIFIED:     
-   ROOT CAUSE: 
+   ROOT CAUSE: Many-to-many joins across large transactional bridge tables (encounter_diagnoses and encounter_procedures).
    Why This is EXTREMELY Slow:
-
+      - The query joins four tables, including two bridge tables with many-to-many relationships.
+      - The join conditions involve complex logic and multiple conditions, which are expensive to compute.
+      - No pre-aggregation exists; everything is calculated at query time
 
 
 QUESTION 3: 30-Day Readmission Rate
@@ -102,9 +108,11 @@ PERFORMANCE ANALYSIS:
    Estimated Rows Scanned: 83777
 
 BOTTLENECK IDENTIFIED:
-   ROOT CAUSE: 
+   ROOT CAUSE: A self-join on the encounters table combined with date range filtering.
    Why This is EXTREMELY Slow:
-   
+      - The self-join forces the database to scan the encounters table twice.
+      - Date range filtering (e2.encounter_date > e1.discharge_date AND e2.encounter_date <= DATE_ADD(e1.discharge_date, INTERVAL 30 DAY)) is computed at runtime, preventing index usage.
+      - The database must compare each inpatient encounter against all subsequent encounters for the same patient.
 
 
 
@@ -137,6 +145,8 @@ PERFORMANCE ANALYSIS:
    Estimated Rows Scanned: 91312
 
 BOTTLENECK IDENTIFIED:
-   ROOT CAUSE: 
+   ROOT CAUSE: Multiple joins combined with runtime aggregations and date transformations.
    Why This is Slow:
-   
+      - The query joins four tables, including billing and encounters.
+      - Runtime aggregations (SUM, AVG) and date transformations (DATE_FORMAT) are computed at query time.
+      - Revenue is calculated dynamically with no pre-aggregation.
