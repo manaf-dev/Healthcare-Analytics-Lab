@@ -43,3 +43,13 @@ To understand the project, it is recommended to review the documents in the foll
 6. `star_schema.sql`: To review the actual schema definition (if available).
 
 This project serves as a practical demonstration of applying data warehousing principles to improve analytical query performance on healthcare data.
+
+## ERD Diagrams
+
+### Original OLTP Schema
+
+![Original OLTP Schema ERD](oltp_erd.png)
+
+
+### Star Schema ERD
+![Star Schema ERD](olap_erd.png)
