@@ -40,7 +40,7 @@ To understand the project, it is recommended to review the documents in the foll
 3. `query_analysis.txt`: To see the initial OLTP query performance issues.
 4. `star_schema_queries.txt`: To observe the improved performance with the star schema.
 5. `reflection.md`: For a comprehensive analysis and summary of the project's outcomes and learnings.
-6. `star_schema.sql`: To review the actual schema definition (if available).
+6. `star_schema.sql`: To review the actual schema definition.
 
 This project serves as a practical demonstration of applying data warehousing principles to improve analytical query performance on healthcare data.
 
